@@ -14,39 +14,91 @@ import (
 //Your algorithm should run in O(n) complexity.
 
 func longestConsecutive(nums []int) int {
-	if len(nums) <1 {
+	// accept
+	if len(nums) < 1 {
 		return 0
 	}
 
 	sort.Ints(nums)
 	fmt.Println(nums)
 
-	curLen := 0
-	maxLen := 0
-	index  := 0
-	curNum := nums[0]-1
+	curLen := 1
+	maxLen := 1
+	index := 1
+	curNum := nums[0]
 	for {
+		if index >= len(nums) {
+			if maxLen < curLen {
+				maxLen = curLen
+			}
+			break
+		}
+		if nums[index] == curNum+1 {
+			curLen++
+			curNum = nums[index]
+			index++
+			continue
+		}
+		if nums[index] == curNum {
+			index++
+			continue
+		}
 		if maxLen < curLen {
 			maxLen = curLen
-			curLen = 0
-			if index >= len(nums) {
-				break
-			}
-			curNum = nums[index]-1
 		}
-		if index < len(nums) && nums[index] == curNum +1 {
-			curLen ++
-			curNum = nums[index]
-		}
-		index ++
+		curLen = 1
+		curNum = nums[index]
+		index++
 	}
 	return maxLen
 }
 
-func main() {
-//	nums := [...]int{100, 4, 200, 1, 3, 2}
-	nums := [...]int{9,1,4,7,3,-1,0,5,8,-1,6}
+func longestConsecutive(nums []int) int {
+	m := make(map[int]int)
+	ret := 0
 
-	l := longestConsecutive(nums[:])
+	for _, n := range nums[:] {
+		if m[n] != 0 {
+			continue
+		}
+
+		if m[n+1] == 0 && m[n-1] == 0 {
+			m[n] = 1
+			if ret < m[n] {
+				ret = m[n]
+			}
+			continue
+		}
+		if m[n+1] == 0 {
+			m[n] = m[n-1] + 1
+			m[n-m[n-1]] = m[n]
+			if ret < m[n] {
+				ret = m[n]
+			}
+			continue
+		}
+		if m[n-1] == 0 {
+			m[n] = m[n+1] + 1
+			m[n+m[n+1]] = m[n]
+			if ret < m[n] {
+				ret = m[n]
+			}
+			continue
+		}
+		m[n] = m[n-1] + 1 + m[n+1]
+		m[n-m[n-1]] = m[n]
+		m[n+m[n+1]] = m[n]
+		if ret < m[n] {
+			ret = m[n]
+		}
+	}
+	return ret
+}
+
+func main() {
+	//nums := [...]int{100, 4, 200, 1, 3, 2}
+	nums := [...]int{1, 2, 0, 1}
+
+	l := longestConsecutiveV2(nums[:])
 	fmt.Println(l)
 }
