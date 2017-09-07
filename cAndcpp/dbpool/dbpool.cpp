@@ -10,7 +10,7 @@ CResultSet::CResultSet(MYSQL_RES* res)
 	m_res = res;
 
 	// map table field key to index in the result array
-	int num_fields = mysql_num_fields(m_res);
+	m_count = mysql_num_fields(m_res);
 	MYSQL_FIELD* fields = mysql_fetch_fields(m_res);
 	for(int i = 0; i < num_fields; i++)
 	{
@@ -49,8 +49,6 @@ int CResultSet::_GetIndex(const char* key)
 int CResultSet::GetInt(const char* key)
 {
 	int idx = _GetIndex(key);
-	//DEBUG("GetInt: idx = %u",idx);
-	//DEBUG("GetInt: value =  %s",m_row[idx]);
 	if (idx == -1) {
 		return 0;
 	} else {
@@ -68,7 +66,6 @@ char* CResultSet::GetString(const char* key)
 	}
 }
 
-/////////////////////////////////////////
 CPrepareStatement::CPrepareStatement()
 {
 	m_stmt = NULL;
@@ -161,7 +158,7 @@ void CPrepareStatement::SetParam(uint32_t index, const string& value)
         WARN("index too large: %d", index);
         return;
     }
-    
+
     m_param_bind[index].buffer_type = MYSQL_TYPE_STRING;
     m_param_bind[index].buffer = (char*)value.c_str();
     m_param_bind[index].buffer_length = value.size();
@@ -197,7 +194,6 @@ uint32_t CPrepareStatement::GetInsertId()
 	return mysql_stmt_insert_id(m_stmt);
 }
 
-/////////////////////
 CDBConn::CDBConn(CDBPool* pPool)
 {
 	m_pDBPool = pPool;
@@ -237,24 +233,26 @@ const char* CDBConn::GetPoolName()
 
 CResultSet* CDBConn::ExecuteQuery(const char* sql_query)
 {
-
 	if (mysql_real_query(m_mysql, sql_query, strlen(sql_query))) {
 		INFO("mysql_real_query failed once: %s, sql: %s", mysql_error(m_mysql), sql_query);
-	    mysql_ping(m_mysql);
-	    if (mysql_real_query(m_mysql, sql_query, strlen(sql_query))) {
-		    WARN("mysql_real_query failed: %s, sql: %s", mysql_error(m_mysql), sql_query);
-		    return NULL;
+	    if(!mysql_ping(m_mysql)) {
+            if (mysql_real_query(m_mysql, sql_query, strlen(sql_query))) {
+                WARN("mysql_real_query failed: %s, sql: %s", mysql_error(m_mysql), sql_query);
+                return NULL;
+            }
+        } else {
+            WARN("mysql conn go down");
         }
 	}
 
-	MYSQL_RES* res = mysql_store_result(m_mysql);
-	if (!res) {
-		WARN("mysql_store_result failed: %s", mysql_error(m_mysql));
-		return NULL;
-	}
+    MYSQL_RES* res = mysql_store_result(m_mysql);
+    if (!res) {
+        WARN("mysql_store_result failed: %s", mysql_error(m_mysql));
+        return NULL;
+    }
 
-	CResultSet* result_set = new CResultSet(res);
-	return result_set;
+    CResultSet* result_set = new CResultSet(res);
+    return result_set;
 }
 
 bool CDBConn::ExecuteUpdate(const char* sql_query)
@@ -278,6 +276,7 @@ bool CDBConn::ExecuteUpdate(const char* sql_query)
 char* CDBConn::EscapeString(const char* content, uint32_t content_len)
 {
 	if (content_len > (MAX_ESCAPE_STRING_LEN >> 1)) {
+        // mysql_real_escape_string: to must have length*2+1 of from at least
 		m_escape_string[0] = 0;
 	} else {
 		mysql_real_escape_string(m_mysql, m_escape_string, content, content_len);
@@ -291,7 +290,6 @@ uint32_t CDBConn::GetInsertId()
 	return (uint32_t)mysql_insert_id(m_mysql);
 }
 
-////////////////
 CDBPool::CDBPool(const char* pool_name, const char* db_server_ip, uint16_t db_server_port,
 		const char* username, const char* password, const char* db_name, int max_conn_cnt)
 {
@@ -386,27 +384,9 @@ void CDBPool::RelDBConn(CDBConn* pConn)
 	m_free_notify.Unlock();
 }
 
-/////////////////
-CDBManager::CDBManager()
+CDBManager& CDBManager::getInstance()
 {
-
-}
-
-CDBManager::~CDBManager()
-{
-
-}
-
-CDBManager* CDBManager::getInstance()
-{
-	if (!s_db_manager) {
-		s_db_manager = new CDBManager();
-		if (s_db_manager->Init()) {
-			delete s_db_manager;
-			s_db_manager = NULL;
-		}
-	}
-
+    static CDBManager m_dbmanager;
 	return s_db_manager;
 }
 /*
