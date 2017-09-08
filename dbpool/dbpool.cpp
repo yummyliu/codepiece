@@ -5,6 +5,17 @@
 
 CDBManager* CDBManager::s_db_manager = NULL;
 
+uint64_t get_tick_count()
+{
+	struct timeval tval;
+	uint64_t ret_tick;
+
+	gettimeofday(&tval, NULL);
+
+	ret_tick = tval.tv_sec * 1000L + tval.tv_usec / 1000L;
+	return ret_tick;
+}
+
 CResultSet::CResultSet(MYSQL_RES* res)
 {
 	m_res = res;
@@ -217,8 +228,14 @@ int CDBConn::Init()
 	mysql_options(m_mysql, MYSQL_OPT_RECONNECT, &reconnect);
 	mysql_options(m_mysql, MYSQL_SET_CHARSET_NAME, "utf8mb4");
 
-	if (!mysql_real_connect(m_mysql, m_pDBPool->GetDBServerIP(), m_pDBPool->GetUsername(), m_pDBPool->GetPasswrod(),
-			m_pDBPool->GetDBName(), m_pDBPool->GetDBServerPort(), NULL, 0)) {
+	if (!mysql_real_connect(m_mysql,
+                m_pDBPool->GetDBServerIP(),
+                m_pDBPool->GetUsername(),
+                m_pDBPool->GetPasswrod(),
+                m_pDBPool->GetDBName(),
+                m_pDBPool->GetDBServerPort(),
+                NULL,
+                0)) {
 		WARN("mysql_real_connect failed: %s", mysql_error(m_mysql));
 		return 2;
 	}
@@ -233,6 +250,7 @@ const char* CDBConn::GetPoolName()
 
 CResultSet* CDBConn::ExecuteQuery(const char* sql_query)
 {
+    m_last_query_time = get_tick_count();
 	if (mysql_real_query(m_mysql, sql_query, strlen(sql_query))) {
 		INFO("mysql_real_query failed once: %s, sql: %s", mysql_error(m_mysql), sql_query);
 	    if(!mysql_ping(m_mysql)) {
@@ -257,7 +275,7 @@ CResultSet* CDBConn::ExecuteQuery(const char* sql_query)
 
 bool CDBConn::ExecuteUpdate(const char* sql_query)
 {
-
+    m_last_query_time = get_tick_count();
 	if (mysql_real_query(m_mysql, sql_query, strlen(sql_query))) {
 	    mysql_ping(m_mysql);
 	    if (mysql_real_query(m_mysql, sql_query, strlen(sql_query))) {
@@ -290,8 +308,13 @@ uint32_t CDBConn::GetInsertId()
 	return (uint32_t)mysql_insert_id(m_mysql);
 }
 
-CDBPool::CDBPool(const char* pool_name, const char* db_server_ip, uint16_t db_server_port,
-		const char* username, const char* password, const char* db_name, int max_conn_cnt)
+CDBPool::CDBPool(const char* pool_name,
+        const char* db_server_ip,
+        uint16_t db_server_port,
+		const char* username,
+        const char* password,
+        const char* db_name,
+        int max_conn_cnt)
 {
 	m_pool_name = pool_name;
 	m_db_server_ip = db_server_ip;
@@ -326,23 +349,36 @@ int CDBPool::Init()
 		m_free_list.push_back(pDBConn);
 	}
 
-	logInfo("db pool: %s, size: %d", m_pool_name.c_str(), (int)m_free_list.size());
+	INFO("db pool: %s, size: %d", m_pool_name.c_str(), (int)m_free_list.size());
 	return 0;
 }
 
-/*
- *TODO: 增加保护机制，把分配的连接加入另一个队列，这样获取连接时，如果没有空闲连接，
- *TODO: 检查已经分配的连接多久没有返回，如果超过一定时间，则自动收回连接，放在用户忘了调用释放连接的接口
- */
+CDBConn* CDBPool::GetTimeOutConn() {
+    for (auto& pconn : m_busy_list) {
+        uint64_t cur_time = get_tick_count();
+        if (pconn.m_last_query_time + CONNECT_TIMEOUT >= cur_time) {
+            return pconn;
+        }
+    }
+    return NULL;
+}
 CDBConn* CDBPool::GetDBConn()
 {
 	m_free_notify.Lock();
 
 	while (m_free_list.empty()) {
+        CDBConn* pDBConn = NULL;
+        // check busy_list if one conn is timeout
+        if (pDBConn = GetTimeOutConn()){
+			m_free_list.push_back(pDBConn);
+            INFO("get timeout conn from busy_list");
+            break;
+        }
+
 		if (m_db_cur_conn_cnt >= m_db_max_conn_cnt) {
 			m_free_notify.Wait();
 		} else {
-			CDBConn* pDBConn = new CDBConn(this);
+			pDBConn = new CDBConn(this);
 			int ret = pDBConn->Init();
 			if (ret) {
 				WARN("Init DBConnecton failed");
@@ -353,12 +389,14 @@ CDBConn* CDBPool::GetDBConn()
 				m_free_list.push_back(pDBConn);
 				m_db_cur_conn_cnt++;
 				logInfo("new db connection: %s, conn_cnt: %d", m_pool_name.c_str(), m_db_cur_conn_cnt);
+                break;
 			}
 		}
 	}
 
 	CDBConn* pConn = m_free_list.front();
 	m_free_list.pop_front();
+    m_busy_list.push_back(pConn);
 
 	m_free_notify.Unlock();
 
@@ -389,59 +427,23 @@ CDBManager& CDBManager::getInstance()
     static CDBManager m_dbmanager;
 	return s_db_manager;
 }
-/*
- * 2015-01-12
- * modify by ZhangYuanhao :enable config the max connection of every instance
- *
- */
-int CDBManager::Init()
+
+int CDBManager::_init(DbConfig* DBs, uint32_t count);
 {
-	CConfigFileReader config_file("dbproxyserver.conf");
-
-	char* db_instances = config_file.GetConfigName("DBInstances");
-
-	if (!db_instances) {
-		WARN("not configure DBInstances");
-		return 1;
-	}
-
-	char host[64];
-	char port[64];
-	char dbname[64];
-	char username[64];
-	char password[64];
-    char maxconncnt[64];
-	CStrExplode instances_name(db_instances, ',');
-
-	for (uint32_t i = 0; i < instances_name.GetItemCnt(); i++) {
-		char* pool_name = instances_name.GetItem(i);
-		snprintf(host, 64, "%s_host", pool_name);
-		snprintf(port, 64, "%s_port", pool_name);
-		snprintf(dbname, 64, "%s_dbname", pool_name);
-		snprintf(username, 64, "%s_username", pool_name);
-		snprintf(password, 64, "%s_password", pool_name);
-        snprintf(maxconncnt, 64, "%s_maxconncnt", pool_name);
-
-		char* db_host = config_file.GetConfigName(host);
-		char* str_db_port = config_file.GetConfigName(port);
-		char* db_dbname = config_file.GetConfigName(dbname);
-		char* db_username = config_file.GetConfigName(username);
-		char* db_password = config_file.GetConfigName(password);
-        char* str_maxconncnt = config_file.GetConfigName(maxconncnt);
-
-		if (!db_host || !str_db_port || !db_dbname || !db_username || !db_password || !str_maxconncnt) {
-			WARN("not configure db instance: %s", pool_name);
-			return 2;
-		}
-
-		int db_port = atoi(str_db_port);
-        int db_maxconncnt = atoi(str_maxconncnt);
-		CDBPool* pDBPool = new CDBPool(pool_name, db_host, db_port, db_username, db_password, db_dbname, db_maxconncnt);
+	for (uint32_t i = 0; i < count; i++) {
+		CDBPool* pDBPool = new CDBPool(
+                   DBs[i]->name,
+                   DBs[i]->host,
+                   DBs[i]->port,
+                   DBs[i]->username,
+                   DBs[i]->password,
+                   DBs[i]->dbname,
+                   DBs[i]->maxconncnt);
 		if (pDBPool->Init()) {
 			WARN("init db instance failed: %s", pool_name);
 			return 3;
 		}
-		m_dbpool_map.insert(make_pair(pool_name, pDBPool));
+		m_dbpool_map.insert(make_pair(DBs[i]->name, pDBPool));
 	}
 
 	return 0;
@@ -462,8 +464,6 @@ void CDBManager::RelDBConn(CDBConn* pConn)
 	if (!pConn) {
 		return;
 	}
-    //test commmit
-
 	map<string, CDBPool*>::iterator it = m_dbpool_map.find(pConn->GetPoolName());
 	if (it != m_dbpool_map.end()) {
 		it->second->RelDBConn(pConn);

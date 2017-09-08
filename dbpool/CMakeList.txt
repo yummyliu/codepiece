@@ -1,0 +1,5 @@
+cmake minimum required (VERSION 2.8)
+
+project (dbpool)
+
+

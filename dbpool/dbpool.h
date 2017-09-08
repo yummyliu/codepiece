@@ -6,6 +6,7 @@
 #include <mysql.h>
 
 #define MAX_ESCAPE_STRING_LEN	10240
+#define CONNECT_TIMEOUT         15000  // 15s
 
 class CResultSet {
 public:
@@ -23,10 +24,6 @@ private:
 	map<string, int>	m_key_map;    // key -> index in row
 };
 
-/*
- * TODO:
- * 用MySQL的prepare statement接口来防止SQL注入
- */
 class CPrepareStatement {
 public:
 	CPrepareStatement();
@@ -64,6 +61,7 @@ public:
      * see this for help: https://codereview.stackexchange.com/questions/71932/my-method-of-escaping-mysql-strings-in-c
      */
 	char* EscapeString(const char* content, uint32_t content_len);
+
 	uint32_t GetInsertId();
 	const char* GetPoolName();
 	MYSQL* GetMysql() { return m_mysql; }
@@ -72,6 +70,8 @@ private:
 	CDBPool* 	m_pDBPool;
 	MYSQL* 		m_mysql;
 	char		m_escape_string[MAX_ESCAPE_STRING_LEN + 1];
+
+    uint64_t    m_last_query_time;
 };
 
 class CDBPool {
@@ -105,10 +105,21 @@ private:
 	int			m_db_cur_conn_cnt;
 	int 		m_db_max_conn_cnt;
 
+    list<CDBConn*>  m_busy_list;
 	list<CDBConn*>	m_free_list;
     // a lock for multi-thread
 	ThreadNotify	m_free_notify;
 };
+
+typedef struct {
+    string name;
+    string host;
+    uint32_t port;
+    string dbname;
+    string username;
+    string password;
+    uint32_t maxconncnt;
+}DbConfig;
 
 /*
  * manage db pool
@@ -125,7 +136,7 @@ public:
 
 private:
 	CDBManager();
-	int _init();
+	int _init(DbConfig* DBs, uint32_t count);
 
 private:
     // key: dbpool_name
