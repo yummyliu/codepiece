@@ -1,4 +1,4 @@
-#include "DBPool.h"
+#include "dbpool.h"
 #include "ConfigFileReader.h"
 
 #define MIN_DB_CONN_CNT		2

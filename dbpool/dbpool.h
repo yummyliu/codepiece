@@ -1,8 +1,6 @@
 #ifndef DBPOOL_H_
 #define DBPOOL_H_
 
-#include "../base/util.h"
-#include "ThreadPool.h"
 #include <mysql.h>
 
 #define MAX_ESCAPE_STRING_LEN	10240
