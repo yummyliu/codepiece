@@ -1,9 +1,7 @@
+#include <sys/time.h>
 #include "dbpool.h"
-#include "ConfigFileReader.h"
 
 #define MIN_DB_CONN_CNT		2
-
-CDBManager* CDBManager::s_db_manager = NULL;
 
 uint64_t get_tick_count()
 {
@@ -16,6 +14,23 @@ uint64_t get_tick_count()
 	return ret_tick;
 }
 
+Notify::Notify()
+{
+	pthread_mutexattr_init(&m_mutexattr);
+	pthread_mutexattr_settype(&m_mutexattr, PTHREAD_MUTEX_RECURSIVE);
+	pthread_mutex_init(&m_mutex, &m_mutexattr);
+
+	pthread_cond_init(&m_cond, NULL);
+}
+
+Notify::~Notify()
+{
+	pthread_mutexattr_destroy(&m_mutexattr);
+	pthread_mutex_destroy(&m_mutex);
+
+	pthread_cond_destroy(&m_cond);
+}
+
 CResultSet::CResultSet(MYSQL_RES* res)
 {
 	m_res = res;
@@ -23,7 +38,7 @@ CResultSet::CResultSet(MYSQL_RES* res)
 	// map table field key to index in the result array
 	m_count = mysql_num_fields(m_res);
 	MYSQL_FIELD* fields = mysql_fetch_fields(m_res);
-	for(int i = 0; i < num_fields; i++)
+	for(uint32_t i = 0; i < m_count; i++)
 	{
 	   m_key_map.insert(make_pair(fields[i].name, i));
 	}
@@ -39,8 +54,8 @@ CResultSet::~CResultSet()
 
 bool CResultSet::Next()
 {
-	m_row = mysql_fetch_row(m_res);
-	if (m_row) {
+	m_curent_row = mysql_fetch_row(m_res);
+	if (m_curent_row) {
 		return true;
 	} else {
 		return false;
@@ -63,7 +78,7 @@ int CResultSet::GetInt(const char* key)
 	if (idx == -1) {
 		return 0;
 	} else {
-		return atoi(m_row[idx]);
+		return atoi(m_curent_row[idx]);
 	}
 }
 
@@ -73,7 +88,7 @@ char* CResultSet::GetString(const char* key)
 	if (idx == -1) {
 		return NULL;
 	} else {
-		return m_row[idx];
+		return m_curent_row[idx];
 	}
 }
 
@@ -105,13 +120,11 @@ bool CPrepareStatement::Init(MYSQL* mysql, string& sql)
 	    mysql_ping(mysql);
         m_stmt = mysql_stmt_init(mysql);
         if (!m_stmt) {
-		    WARN("mysql_stmt_init failed");
 		    return false;
         }
 	}
 
 	if (mysql_stmt_prepare(m_stmt, sql.c_str(), sql.size())) {
-		WARN("mysql_stmt_prepare failed: %s", mysql_stmt_error(m_stmt));
 		return false;
 	}
 
@@ -119,7 +132,6 @@ bool CPrepareStatement::Init(MYSQL* mysql, string& sql)
 	if (m_param_cnt > 0) {
 		m_param_bind = new MYSQL_BIND [m_param_cnt];
 		if (!m_param_bind) {
-			WARN("new failed");
 			return false;
 		}
 
@@ -132,7 +144,6 @@ bool CPrepareStatement::Init(MYSQL* mysql, string& sql)
 void CPrepareStatement::SetParam(uint32_t index, int& value)
 {
 	if (index >= m_param_cnt) {
-		WARN("index too large: %d", index);
 		return;
 	}
 
@@ -143,7 +154,6 @@ void CPrepareStatement::SetParam(uint32_t index, int& value)
 void CPrepareStatement::SetParam(uint32_t index, uint32_t& value)
 {
 	if (index >= m_param_cnt) {
-		WARN("index too large: %d", index);
 		return;
 	}
 
@@ -154,7 +164,6 @@ void CPrepareStatement::SetParam(uint32_t index, uint32_t& value)
 void CPrepareStatement::SetParam(uint32_t index, string& value)
 {
 	if (index >= m_param_cnt) {
-		WARN("index too large: %d", index);
 		return;
 	}
 
@@ -166,7 +175,6 @@ void CPrepareStatement::SetParam(uint32_t index, string& value)
 void CPrepareStatement::SetParam(uint32_t index, const string& value)
 {
     if (index >= m_param_cnt) {
-        WARN("index too large: %d", index);
         return;
     }
 
@@ -178,22 +186,18 @@ void CPrepareStatement::SetParam(uint32_t index, const string& value)
 bool CPrepareStatement::ExecuteUpdate()
 {
 	if (!m_stmt) {
-		WARN("no m_stmt");
 		return false;
 	}
 
 	if (mysql_stmt_bind_param(m_stmt, m_param_bind)) {
-		WARN("mysql_stmt_bind_param failed: %s", mysql_stmt_error(m_stmt));
 		return false;
 	}
 
 	if (mysql_stmt_execute(m_stmt)) {
-		WARN("mysql_stmt_execute failed: %s", mysql_stmt_error(m_stmt));
 		return false;
 	}
 
 	if (mysql_stmt_affected_rows(m_stmt) == 0) {
-		WARN("ExecuteUpdate have no effect");
 		return false;
 	}
 
@@ -220,7 +224,6 @@ int CDBConn::Init()
 {
 	m_mysql = mysql_init(NULL);
 	if (!m_mysql) {
-		WARN("mysql_init failed");
 		return 1;
 	}
 
@@ -236,7 +239,6 @@ int CDBConn::Init()
                 m_pDBPool->GetDBServerPort(),
                 NULL,
                 0)) {
-		WARN("mysql_real_connect failed: %s", mysql_error(m_mysql));
 		return 2;
 	}
 
@@ -252,20 +254,16 @@ CResultSet* CDBConn::ExecuteQuery(const char* sql_query)
 {
     m_last_query_time = get_tick_count();
 	if (mysql_real_query(m_mysql, sql_query, strlen(sql_query))) {
-		INFO("mysql_real_query failed once: %s, sql: %s", mysql_error(m_mysql), sql_query);
 	    if(!mysql_ping(m_mysql)) {
             if (mysql_real_query(m_mysql, sql_query, strlen(sql_query))) {
-                WARN("mysql_real_query failed: %s, sql: %s", mysql_error(m_mysql), sql_query);
                 return NULL;
             }
         } else {
-            WARN("mysql conn go down");
         }
 	}
 
     MYSQL_RES* res = mysql_store_result(m_mysql);
     if (!res) {
-        WARN("mysql_store_result failed: %s", mysql_error(m_mysql));
         return NULL;
     }
 
@@ -279,7 +277,6 @@ bool CDBConn::ExecuteUpdate(const char* sql_query)
 	if (mysql_real_query(m_mysql, sql_query, strlen(sql_query))) {
 	    mysql_ping(m_mysql);
 	    if (mysql_real_query(m_mysql, sql_query, strlen(sql_query))) {
-		    WARN("mysql_real_query failed: %s, sql: %s", mysql_error(m_mysql), sql_query);
 		    return false;
         }
 	}
@@ -314,7 +311,7 @@ CDBPool::CDBPool(const char* pool_name,
 		const char* username,
         const char* password,
         const char* db_name,
-        int max_conn_cnt)
+        uint32_t max_conn_cnt)
 {
 	m_pool_name = pool_name;
 	m_db_server_ip = db_server_ip;
@@ -349,14 +346,13 @@ int CDBPool::Init()
 		m_free_list.push_back(pDBConn);
 	}
 
-	INFO("db pool: %s, size: %d", m_pool_name.c_str(), (int)m_free_list.size());
 	return 0;
 }
 
 CDBConn* CDBPool::GetTimeOutConn() {
     for (auto& pconn : m_busy_list) {
         uint64_t cur_time = get_tick_count();
-        if (pconn.m_last_query_time + CONNECT_TIMEOUT >= cur_time) {
+        if (pconn->GetLastQueryTime()+ CONNECT_TIMEOUT >= cur_time) {
             return pconn;
         }
     }
@@ -369,9 +365,8 @@ CDBConn* CDBPool::GetDBConn()
 	while (m_free_list.empty()) {
         CDBConn* pDBConn = NULL;
         // check busy_list if one conn is timeout
-        if (pDBConn = GetTimeOutConn()){
+        if ((pDBConn = GetTimeOutConn())){
 			m_free_list.push_back(pDBConn);
-            INFO("get timeout conn from busy_list");
             break;
         }
 
@@ -381,14 +376,12 @@ CDBConn* CDBPool::GetDBConn()
 			pDBConn = new CDBConn(this);
 			int ret = pDBConn->Init();
 			if (ret) {
-				WARN("Init DBConnecton failed");
 				delete pDBConn;
 				m_free_notify.Unlock();
 				return NULL;
 			} else {
 				m_free_list.push_back(pDBConn);
 				m_db_cur_conn_cnt++;
-				logInfo("new db connection: %s, conn_cnt: %d", m_pool_name.c_str(), m_db_cur_conn_cnt);
                 break;
 			}
 		}
@@ -425,25 +418,24 @@ void CDBPool::RelDBConn(CDBConn* pConn)
 CDBManager& CDBManager::getInstance()
 {
     static CDBManager m_dbmanager;
-	return s_db_manager;
+	return m_dbmanager;
 }
 
-int CDBManager::_init(DbConfig* DBs, uint32_t count);
+int CDBManager::_init(DbConfig* DBs, uint32_t count)
 {
 	for (uint32_t i = 0; i < count; i++) {
 		CDBPool* pDBPool = new CDBPool(
-                   DBs[i]->name,
-                   DBs[i]->host,
-                   DBs[i]->port,
-                   DBs[i]->username,
-                   DBs[i]->password,
-                   DBs[i]->dbname,
-                   DBs[i]->maxconncnt);
+                   DBs[i].name,
+                   DBs[i].host,
+                   DBs[i].port,
+                   DBs[i].username,
+                   DBs[i].password,
+                   DBs[i].dbname,
+                   DBs[i].maxconncnt);
 		if (pDBPool->Init()) {
-			WARN("init db instance failed: %s", pool_name);
 			return 3;
 		}
-		m_dbpool_map.insert(make_pair(DBs[i]->name, pDBPool));
+		m_dbpool_map.insert(make_pair(DBs[i].name, pDBPool));
 	}
 
 	return 0;

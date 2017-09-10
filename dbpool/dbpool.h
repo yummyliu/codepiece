@@ -1,10 +1,44 @@
 #ifndef DBPOOL_H_
 #define DBPOOL_H_
-
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <pthread.h>
+#include <string>
+#include <map>
+#include <list>
 #include <mysql.h>
+
+using namespace std;
 
 #define MAX_ESCAPE_STRING_LEN	10240
 #define CONNECT_TIMEOUT         15000  // 15s
+
+typedef struct {
+    char* name;
+    char* host;
+    uint32_t port;
+    char*  dbname;
+    char*  username;
+    char*  password;
+    uint32_t maxconncnt;
+}DbConfig;
+
+class Notify
+{
+public:
+	Notify();
+	~Notify();
+	void Lock() { pthread_mutex_lock(&m_mutex); }
+	void Unlock() { pthread_mutex_unlock(&m_mutex); }
+	void Wait() { pthread_cond_wait(&m_cond, &m_mutex); }
+	void Signal() { pthread_cond_signal(&m_cond); }
+private:
+	pthread_mutex_t 	m_mutex;
+	pthread_mutexattr_t	m_mutexattr;
+
+	pthread_cond_t 		m_cond;
+};
 
 class CResultSet {
 public:
@@ -63,6 +97,8 @@ public:
 	uint32_t GetInsertId();
 	const char* GetPoolName();
 	MYSQL* GetMysql() { return m_mysql; }
+    uint64_t GetLastQueryTime() {return m_last_query_time;}
+    void SetLastQueryTime(uint64_t time) {m_last_query_time = time;}
 
 private:
 	CDBPool* 	m_pDBPool;
@@ -80,7 +116,7 @@ public:
 			const char* username,
             const char* password,
             const char* db_name,
-            int max_conn_cnt);
+            uint32_t max_conn_cnt);
 	virtual ~CDBPool();
 
 	int Init();
@@ -94,6 +130,8 @@ public:
 	const char* GetPasswrod() { return m_password.c_str(); }
 	const char* GetDBName() { return m_db_name.c_str(); }
 private:
+    CDBConn*    GetTimeOutConn();
+
 	string 		m_pool_name;
 	string 		m_db_server_ip;
 	uint16_t	m_db_server_port;
@@ -106,18 +144,8 @@ private:
     list<CDBConn*>  m_busy_list;
 	list<CDBConn*>	m_free_list;
     // a lock for multi-thread
-	ThreadNotify	m_free_notify;
+	Notify	m_free_notify;
 };
-
-typedef struct {
-    string name;
-    string host;
-    uint32_t port;
-    string dbname;
-    string username;
-    string password;
-    uint32_t maxconncnt;
-}DbConfig;
 
 /*
  * manage db pool
@@ -127,7 +155,7 @@ typedef struct {
 class CDBManager {
 public:
 	virtual ~CDBManager();
-	static CDBManager* getInstance();
+	CDBManager& getInstance();
 
 	CDBConn* GetDBConn(const char* dbpool_name);
 	void RelDBConn(CDBConn* pConn);
@@ -140,3 +168,4 @@ private:
     // key: dbpool_name
 	map<string, CDBPool*>	m_dbpool_map;
 };
+#endif
