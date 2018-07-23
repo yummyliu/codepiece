@@ -39,12 +39,28 @@
 // 题意解释：
 // 有一个不大于50*50的迷宫，其中有若干数；找到迷宫中大于1的最小数的位置[i,j]和最大数[m,n]，按顺序从[i,j]走到[m,n]的步数。
 // 1可以走，0不可以走，走过的位置都是1
-#include <stdio.h>
+package main
 
-struct TreePos 
+import (
+	"container/list"
+)
 
-int cutOffTree(int** forest, int forestRowSize, int *forestColSizes) {
-    // walk through once , find sequence of all tree & position
+type TreePos struct {
+	x int
+	y int
+	h int
+}
 
-    return -1;
+func cutOffTree(forest [][]int) int {
+	ts := list.New()
+
+	for i := 0; i < len(forest); i++ {
+		for j := 0; j < len(forest[0]; j++ {
+			if forest[i][j] > 1 {
+				ts.PushBack(TreePos{i,j,forest[i][j]})
+			}
+		}
+	}
+
+
 }
