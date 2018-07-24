@@ -30,4 +30,43 @@
 //
 // board will be a 2 x 3 array as described above.
 // board[i][j] will be a permutation of [0, 1, 2, 3, 4, 5].
+
 package main
+
+import (
+	"fmt"
+)
+
+func slidingPuzzle(board [][]int) int {
+	// local var
+	ac := []int{1,-1,3,-3}
+	final_bs := []int{5,0,1,2,3,4}
+
+	// init
+	var bs [6]int
+	var bi int = 0
+	for i := 0; i < len(board); i++ {
+		fmt.Println(board[i])
+		for j := 0; j < len(board[i]); j++ {
+			bs[board[i][j]] = bi
+			bi++;
+		}
+	}
+
+	fmt.Println(bs)
+	fmt.Println(final_bs)
+
+
+
+	return -1;
+}
+
+func main() {
+	board := [][]int{
+		{3,2,4},
+		{1,5,0},
+	}
+
+	fmt.Println(slidingPuzzle(board))
+
+}
