@@ -201,6 +201,7 @@ func cutOffTree(forest [][]int) int {
 	}
 	return sum
 }
+
 func main() {
 	forest := [][]int{
 		{3, 2, 1},
