@@ -10,9 +10,14 @@ using namespace web::http::client;
 using namespace concurrency::streams;
 using namespace std;
 
-int main()
+int main(int argc, char *argv[])
 {
-	auto url = "http://localhost:3000/responseData";
+	if (argc != 2) {
+		std::cout << "need key" << std::endl;
+		return 0;
+	}
+	auto key = argv[1];
+	auto url = "http://localhost:3000/dbs";
 
 	http_client client(url);
 	client.request(methods::GET)
@@ -26,11 +31,11 @@ int main()
 					// Handle error cases, for now return empty json value...
 					return pplx::task_from_result(json::value());
 				})
-	.then([](pplx::task<json::value> previousTask){
+	.then([&key](pplx::task<json::value> previousTask){
 			try
 			{
 				const json::value& v = previousTask.get();
-				cout << v.as_object().at("cursor").serialize() <<endl;
+				cout << v.as_object().at(key).serialize() <<endl;
 			}
 			catch (const http_exception& e)
 			{
