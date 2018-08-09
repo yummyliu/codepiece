@@ -12,6 +12,7 @@
 
 #include <cpprest/http_client.h>
 #include <cpprest/filestream.h>
+#include <cpprest/streams.h>
 
 using namespace utility;
 using namespace web::http;
@@ -46,8 +47,8 @@ int main(int argc, char *args[])
 	}
 	//	const string_t searchTerm = args[1];
 	const string_t outputFileName = args[1];
-
 	auto fileBuffer = std::make_shared<streambuf<uint8_t>>();
+
 	// Open a stream to the file to write the HTTP response body into.
 	file_buffer<uint8_t>::open(outputFileName, std::ios::out)
 		.then([=](streambuf<uint8_t> outFile) -> pplx::task<http_response>
@@ -57,7 +58,7 @@ int main(int argc, char *args[])
 				// Create an HTTP request.
 				// Encode the URI query since it could contain special characters like spaces.
 				http_client client(U("http://localhost:3000"));
-				return client.request(methods::GET, uri_builder(U("/responseData")).to_string());
+				return client.request(methods::GET, uri_builder(U("/dbinfo")).to_string());
 				})
 	// Write the response body into the file buffer.
 	.then([=](http_response response) -> pplx::task<size_t>
