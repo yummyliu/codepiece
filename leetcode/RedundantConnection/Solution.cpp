@@ -76,6 +76,7 @@ public:
 			int parent_v = parent(e[1]);
 			if (parent_u == parent_v) {
 				res = e;
+				break;
 			}
 			ps[e[1]] = parent_u;
 			ps[parent_v] = parent_u;
