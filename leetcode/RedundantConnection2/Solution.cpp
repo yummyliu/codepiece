@@ -49,93 +49,77 @@ using namespace std;
 
 class Solution
 {
-public:
-	Solution (){
-	};
-	virtual ~Solution (){};
+	public:
+		Solution (){
+		};
+		virtual ~Solution (){};
 
-	vector<int> dfs(int root, int t) {
-		vector<int> res;
-		if (cs[root][0] == t) {
-			// left child
-			if (as[0] == root) {
-				res.push_back(as[0]);
-				res.push_back(cs[root][0]);
-				return res;
-			} else {
-				res.push_back(as[1]);
-				res.push_back(cs[root][0]);
-				return res;
+		bool checkloop(int a, std::vector<int> ps) {
+			int i =a;
+			while (ps[i] != 0 && ps[i] != a) {
+				i = ps[i];
 			}
-		} else if (cs[root][1] ==t ) {
-			// right child
-			if (as[0] == root) {
-				res.push_back(as[0]);
-				res.push_back(cs[root][1]);
-				return res;
-			} else {
-				res.push_back(as[1]);
-				res.push_back(cs[root][1]);
-				return res;
+			if (ps[i] == a) {
+				return true;
 			}
-		} else {
-			// deep search
-			auto lres = dfs(cs[root][0], t);
-			auto rres = dfs(cs[root][1], t);
-
-			return (lres.size() != 0)? lres:rres;
-		}
-		return res;
-	}
-
-    vector<int> findRedundantConnection(vector<vector<int>>& edges) {
-		vector<int> res;
-		int maxV =0;
-		for (auto e : edges) {
-			int p = e[0];
-			int c = e[1];
-			if (maxV < p) {
-				maxV = p;
-			}
-			if (maxV < c) {
-				maxV = c;
-			}
-
-			cs[p].push_back(c);
-
-			if (ps[c].size() == 0) {
-				ps[c].push_back(p);
-			} else {
-				// c has two parent, which is not allowed in a tree
-				as[0] = ps[c][0];
-				as[1] = p;
-				t = c;
-				ps[c].erase(ps[c].begin());
-			}
+			return false;
 		}
 
-		// find root
-		int root = 0;
-		for (int i = 1; i < maxV; ++i) {
-			if (ps[i].size() == 0) {
-				root = i;
-				break;
-			}
-		}
-		return dfs(root, t);
-    }
+		vector<int> findRedundantDirectedConnection(vector<vector<int>>& edges) {
+			bool dup_parent =false;
+			vector<int> ps(edges.size()+1, 0);
+			vector<vector<int>> res;
 
-private:
-	vector<int> ps[1001];
-	vector<int> cs[1001];
-	int as[2];
-	int t;
+			// whether one point has two parent
+			for (auto& e : edges) {
+				int p = e[0];
+				int c = e[1];
+
+				if (ps[c] > 0) {
+					res.push_back({ps[c],c});
+					res.push_back(e);
+					dup_parent = true;
+					e[0] = e[1] = -1;
+				} else {
+					ps[c] = p;
+				}
+			}
+
+			ps = vector<int>(edges.size()+1, 0);
+			// whether has a loop
+			for (auto& e : edges) {
+				int p = e[0];
+				int c = e[1];
+
+				if (p==-1) continue;
+
+				ps[c] = p;
+
+				if (checkloop(p, ps)) {
+					return dup_parent? res[0] : e;
+				}
+			}
+
+			// no loop
+			return res[1];
+		}
+
+
+	private:
 };
 
 int main()
 {
-	std::vector<vector<int>> v = {{2,1},{3,1},{4,2},{1,4}};
+//	std::vector<vector<int>> v = {{2,1},{3,1},{4,2},{1,4}};
+	std::vector<vector<int>> v = {{1,2},{2,3},{3,4},{4,1},{1,5}};
+//	std::vector<vector<int>> v = {{4,1},{1,5},{4,2},{5,1},{4,3}};
 	Solution s;
-	s.findRedundantConnection(v);
+	auto res = s.findRedundantDirectedConnection(v);
+
+	for (auto i : res) {
+		cout << i << " ";
+	}
+	cout << endl;
+
 	return 0;
 }
