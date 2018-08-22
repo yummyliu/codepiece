@@ -22,105 +22,158 @@
 #include <string>
 #include <cctype>
 using namespace std;
+//class Solution {
+//public:
+//	Solution(){}
+//    int calculate(string s) {
+//		int i = 0;
+//		int N = s.size();
+//		int curret = 0;
+//		char curops = '#';
+//
+//		while (i<N) {
+//			if (isdigit(s[i])) {
+//				int tmpret = 0;
+//				while (isdigit(s[i])) {
+//					tmpret = (tmpret)*10 + s[i] - '0';
+//					i++;
+//				}
+//				if (curops == '#') {
+//					curret = tmpret;
+//				} else if (curops == '+') {
+//					curret += tmpret;
+//					curops = '#';
+//				} else if (curops == '-') {
+//					curret -= tmpret;
+//					curops = '#';
+//				}
+//			}
+//			else if (s[i] == '+' || s[i] == '-') {
+//				curops = s[i];
+//				i ++;
+//			}
+//			else if (s[i] == '(') {
+//				int j = i+1;
+//				int lcount = 1;
+//				while (lcount != 0) {
+//					if (s[j] == '(') {
+//						lcount ++;
+//					}
+//					else if (s[j] == ')') {
+//						lcount --;
+//					}
+//					j++;
+//				}
+//				int tmpret = calculate(s.substr(i+1,j-i-2));
+//				if (curops == '#') {
+//					curret = tmpret;
+//				} else if (curops == '+') {
+//					curret += tmpret;
+//					curops = '#';
+//				} else if (curops == '-') {
+//					curret -= tmpret;
+//					curops = '#';
+//				}
+//				i = j;
+//			} else {
+//				i ++;
+//			}
+//		}
+//
+//		return curret;
+//    }
+//};
 class Solution {
-public:
-	Solution(){}
-    int calculate(string s) {
-		int i = 0;
-		int N = s.size();
-		int curret = 0;
-		char curops = '#';
+	public:
+		Solution(){}
+		int calculate(string s) {
+			int i = 0;
+			int N = s.size();
+			int curret = 0;
+			char curops = '#';
 
-		while (i<N) {
-			if (isdigit(s[i])) {
-				int tmpret = 0;
-				while (isdigit(s[i])) {
-					tmpret = (tmpret)*10 + s[i] - '0';
-					i++;
-				}
-				if (curops == '#') {
-					curret = tmpret;
-				} else if (curops == '+') {
-					curret += tmpret;
-					curops = '#';
-				} else if (curops == '-') {
-					curret -= tmpret;
-					curops = '#';
-				}
-			}
-			else if (s[i] == '+' || s[i] == '-') {
-				curops = s[i];
-				i ++;
-			}
-			else if (s[i] == '(') {
-				int j = i+1;
-				int lcount = 1;
-				while (lcount != 0) {
-					if (s[j] == '(') {
-						lcount ++;
+			while (i<N) {
+				if (isdigit(s[i])) {
+					int tmpret = 0;
+					while (isdigit(s[i])) {
+						tmpret = (tmpret)*10 + s[i] - '0';
+						i++;
 					}
-					else if (s[j] == ')') {
-						lcount --;
+					if (curops == '#') {
+						curret = tmpret;
+					} else if (curops == '+') {
+						curret += tmpret;
+						curops = '#';
+					} else if (curops == '-') {
+						curret -= tmpret;
+						curops = '#';
 					}
-					j++;
 				}
-				int tmpret = calculate(s.substr(i+1,j-i-2));
-				if (curops == '#') {
-					curret = tmpret;
-				} else if (curops == '+') {
-					curret += tmpret;
-					curops = '#';
-				} else if (curops == '-') {
-					curret -= tmpret;
-					curops = '#';
+				else if (s[i] == '+' || s[i] == '-') {
+					curops = s[i];
+					i ++;
 				}
-				i = j;
-			} else {
-				i ++;
+				else if (s[i] == '(') {
+					int j = i+1;
+					while (s[j] != ')') {
+						j++;
+					}
+					int tmpret = calculate(s.substr(i+1,j-i-1));
+					if (curops == '#') {
+						curret = tmpret;
+					} else if (curops == '+') {
+						curret += tmpret;
+						curops = '#';
+					} else if (curops == '-') {
+						curret -= tmpret;
+						curops = '#';
+					}
+					i = j+1;
+				} else {
+					i ++;
+				}
 			}
+
+			return curret;
 		}
-
-		return curret;
-    }
 };
-
 string stringToString(string input) {
-//    assert(input.length() >= 2);
-    string result;
+	//    assert(input.length() >= 2);
+	string result;
 	int N = input.length() -1;
-    for (int i = 1; i < N; i++) {
-        char currentChar = input[i];
-        if (input[i] == '\\') {
-            char nextChar = input[i+1];
-            switch (nextChar) {
-                case '\"': result.push_back('\"'); break;
-                case '/' : result.push_back('/'); break;
-                case '\\': result.push_back('\\'); break;
-                case 'b' : result.push_back('\b'); break;
-                case 'f' : result.push_back('\f'); break;
-                case 'r' : result.push_back('\r'); break;
-                case 'n' : result.push_back('\n'); break;
-                case 't' : result.push_back('\t'); break;
-                default: break;
-            }
-            i++;
-        } else {
-          result.push_back(currentChar);
-        }
-    }
-    return result;
+	for (int i = 1; i < N; i++) {
+		char currentChar = input[i];
+		if (input[i] == '\\') {
+			char nextChar = input[i+1];
+			switch (nextChar) {
+				case '\"': result.push_back('\"'); break;
+				case '/' : result.push_back('/'); break;
+				case '\\': result.push_back('\\'); break;
+				case 'b' : result.push_back('\b'); break;
+				case 'f' : result.push_back('\f'); break;
+				case 'r' : result.push_back('\r'); break;
+				case 'n' : result.push_back('\n'); break;
+				case 't' : result.push_back('\t'); break;
+				default: break;
+			}
+			i++;
+		} else {
+			result.push_back(currentChar);
+		}
+	}
+	return result;
 }
 
 int main() {
-    string line;
-    while (getline(cin, line)) {
-        string s = stringToString(line);
+	string line;
+	while (getline(cin, line)) {
+		string s = stringToString(line);
 
-        int ret = Solution().calculate(s);
+		int ret = Solution().calculate(s);
 
-        string out = to_string(ret);
-        cout << out << endl;
-    }
-    return 0;
+		string out = to_string(ret);
+		cout << out << endl;
+	}
+	return 0;
 }
 
