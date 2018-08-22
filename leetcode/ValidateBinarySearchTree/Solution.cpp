@@ -12,9 +12,29 @@ struct TreeNode {
 
 class Solution {
 public:
-    bool isValidBST(TreeNode* root) {
+	int checker(TreeNode* root, int* _min, int* _max) {
+		if (!root) {
+			return true;
+		}
 
-		return faluse;
+		int lmin, lmax, rmin, rmax;
+		bool leftisvalid = checker(root->left, &lmin, &lmax);
+		bool rightisvalid = checker(root->right, &rmin, &rmax);
+		if (leftisvalid && rightisvalid
+			&& (!root->left || root->val > lmax)
+			&& (!root->right || root->val < rmin)
+		   ){
+			if (!root->left) *_min = root->val;
+			else *_min = lmin;
+			if (!root->right) *_max= root->val;
+			else *_max = rmax;
+			return true;
+		}
+		return false;
+	}
+    bool isValidBST(TreeNode* root) {
+		int tmpmin, tmpmax;
+		return checker(root, &tmpmin, &tmpmax);
     }
 };
 
