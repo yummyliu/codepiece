@@ -62,7 +62,7 @@ func main() {
 		if val,err := strconv.Atoi(cmd); err==nil {
 			// isdigit
 			ret := ug.idToShortUrl(uint64(val))
-			fmt.Println("tur: ", ret)
+			fmt.Println("%s %s %s", cmd, val ,ret)
 		} else {
 			fmt.Println(cmd)
 			ret := ug.shortUrlToId(cmd)
