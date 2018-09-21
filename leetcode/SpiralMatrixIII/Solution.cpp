@@ -10,7 +10,7 @@ public:
 	Solution (){};
 	virtual ~Solution (){};
 
-    vector<vector<int>> spiralMatrixIII(int R, int C, int r0, int c0) {
+    vector<vector<int>> spiralMatrixIII_(int R, int C, int r0, int c0) {
 		int tmpmax0 = (R-1-r0 < r0)?r0:R-1-r0;
 		int tmpmax1 = (C-1-c0 < c0)?c0:C-1-c0;
 		int radius = (tmpmax0 > tmpmax1)? tmpmax0 : tmpmax1;
@@ -83,12 +83,68 @@ public:
 
 		return ret;
 	}
+
+    vector<vector<int>> spiralMatrixIII(int R, int C, int r0, int c0) {
+		vector<vector<int>> ret = {{r0,c0}};
+
+		if (R*C == 1) {
+			return ret;
+		}
+
+		for (int walklen = 1; walklen < 2*(R+C); walklen+=2) {
+			// right
+			int wk = walklen;
+			while (wk--) {
+				c0++;
+				if (r0 >= 0 && r0 < R && c0 >= 0 && c0 < C) {
+					ret.push_back({r0,c0});
+					if (ret.size() == size_t(R*C)) {
+						return ret;
+					}
+				}
+			}
+			// down
+			wk = walklen;
+			while (wk--) {
+				r0++;
+				if (r0 >= 0 && r0 < R && c0 >= 0 && c0 < C) {
+					ret.push_back({r0,c0});
+					if (ret.size() == size_t(R*C)) {
+						return ret;
+					}
+				}
+			}
+			// left
+			wk = walklen+1;
+			while (wk --) {
+				c0--;
+				if (r0 >= 0 && r0 < R && c0 >= 0 && c0 < C) {
+					ret.push_back({r0,c0});
+					if (ret.size() == size_t(R*C)) {
+						return ret;
+					}
+				}
+			}
+			// up
+			wk = walklen+1;
+			while (wk --) {
+				r0--;
+				if (r0 >= 0 && r0 < R && c0 >= 0 && c0 < C) {
+					ret.push_back({r0,c0});
+					if (ret.size() == size_t(R*C)) {
+						return ret;
+					}
+				}
+			}
+		}
+		return ret;
+	}
 };
 
 int main()
 {
 	Solution s;
-	auto r = s.spiralMatrixIII(3,3,1,1);
+	auto r = s.spiralMatrixIII(1,4,0,0);
 
 	return 0;
 }
