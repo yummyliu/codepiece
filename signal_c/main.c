@@ -2,34 +2,68 @@
 #include <signal.h>
 #include <signal.h>
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 
-int numofchild = 0;
-void sigchildhandler() {int aa; numofchild --; wait(&aa);}
-int main() {
-  char cmd[1000], buf[1000], *argv[2];
-  struct sigaction abc;
-  int pid;
+int ischild=0;
+static void sig_parent_handler(int signo)
+{
+	switch (signo) {
+		case SIGCHLD:
+			printf("caught SIGCHLD: %d\n", signo);
+			break;
+		case SIGINT:
+			printf("caught SIGINT: %d\n", signo);
+			break;
+		default:
+			printf("caught UnKnown: %d\n", signo);
+			break;
+	}
+}
+static void sig_child_handler(int signo)
+{
+	switch (signo) {
+		case SIGCHLD:
+			printf("caught child SIGCHLD: %d\n", signo);
+			break;
+		case SIGINT:
+			printf("caught child SIGINT: %d\n", signo);
+			break;
+		default:
+			printf("caught child UnKnown: %d\n", signo);
+			break;
+	}
+}
+static void sig_handler(int signo)
+{
+	if (ischild) {
+		sig_child_handler(signo);
+	} else {
+		sig_parent_handler(signo);
+	}
+}
+int main(int argc, char *argv[])
+{
+	int pid;
 
-  abc.sa_handler = sigchildhandler;
-  sigemptyset(&abc.sa_mask);
-  abc.sa_flags = 0;
+	struct sigaction abc;
+	abc.sa_handler = sig_handler;
+	sigemptyset(&abc.sa_mask);
+	abc.sa_flags = 0;
 
-  sigaction(SIGCHLD, &abc, NULL);
+	sigaction(SIGCHLD, &abc, NULL);
+	sigaction(SIGINT,  &abc, NULL);
+	sigaction(SIGHUP,  &abc, NULL);
 
-  while(1) {
-      while(fgets(buf, 100, stdin) == NULL);
-      sscanf(buf, "%s", cmd);
-      printf("%d children, command = %s\n", numofchild, cmd);
-      fflush(stdout);
-      if (strcmp(cmd, "quit") == 0) {
-          if (numofchild == 0) exit(0);
-          else printf("Cannot exit, there are still %d children.\n", numofchild);
-      }
-      if ((pid = fork()) == 0) {
-          argv[0] = cmd, argv[1] = NULL;
-          execv(argv[0], argv); exit(0);
-     }
-     if (pid != -1) numofchild ++;
-  }
+	if ((pid = fork()) != 0) {
+		printf("%s\n", "this is parent");
+		strncpy(argv[0],"master",strlen(argv[0]));
+		for(;;){pause();}
+	} else {
+		printf("%s\n", "this is child");
+		ischild = 1;
+		strncpy(argv[0],"child",strlen(argv[0]));
+		for(;;){pause();}
+	}
 } /* example6.c */
