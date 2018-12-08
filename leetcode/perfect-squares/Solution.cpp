@@ -5,6 +5,8 @@ using namespace std;
 
 class Solution {
 public:
+	Solution () {
+	}
     int numSquares(int n) {
 		numsquaresRets.resize(n,-1);
 
@@ -15,6 +17,7 @@ public:
 	{
 		int square = (int)sqrt(n);
 		if (n == square*square) {
+			numsquaresRets[n] = 1;
 			return 1;
 		}
 
@@ -23,7 +26,7 @@ public:
 			if (numsquaresRets[n-s*s]!=-1) {
 				minN = min(minN, numsquaresRets[n-s*s]);
 			} else {
-				numsquaresRets[n-s*s] = 1+numSquares(n-s*s);
+				numsquaresRets[n-s*s] = 1+helper(n-s*s);
 				minN = min(minN, numsquaresRets[n-s*s]);
 			}
         }
