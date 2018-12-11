@@ -51,7 +51,35 @@ public:
 
 		return dp[K][N];
     }
+    double largestSumOfAverages_v1(vector<int>& A, int K) {
+		// loop dp
+	    int N = A.size();
+        vector<int> P(1,0);
+
+        for (int i=0; i<N; ++i) {
+            P.push_back(P.back() + A[i]);
+        }
+
+        vector<double> dp;
+        for(int i = 0; i<N; ++i) {
+            dp.push_back(average(P,i,N));
+        }
+
+        for(int m=0; m<K-1; m++) {
+            for(int i=0; i<N; i++)
+                for(int j=i+1;j<N;j++)
+                    dp[i] = max(dp[i],average(P,i,j)+dp[j]);
+        }
+
+        return dp[0];
+    }
+
+    double average(const vector<int> &P, int i, int j) {
+        return double((P[j]-P[i]))/(j-i);
+    }
+
 };
+
 
 int main()
 {
