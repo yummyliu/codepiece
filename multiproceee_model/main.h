@@ -20,14 +20,36 @@
 typedef void (*spawn_proc_pt) (void *data);
 typedef struct event my_event_t;
 typedef struct child_s child_t;
+typedef struct client client_t;
+
+/**
+ * A struct for client specific data, also includes pointer to create
+ * a list of clients.
+ *
+ * In event based programming it is usually necessary to keep some
+ * sort of object per client for state information.
+ */
+struct client {
+    /* Events. We need 2 event structures, one for read event
+     * notification and the other for writing. */
+    struct event ev_read;
+    struct event ev_write;
+
+    /* This is the queue of data to be written to this client. As
+     * we can't call write(2) until libevent tells us the socket
+     * is ready for writing. */
+    TAILQ_HEAD(, bufferq) writeq;
+};
+
 struct child_s {
-	/* data */
-	int channel[2];
-	int pid;
-	int                 status;
+	int		channel[2];
+	int		pid;
+	int     status;
 
 	spawn_proc_pt   proc;
-	void               *data;
+	void    *data;
+
+	client_t conn_clients;
 };
 /**
  * In event based programming we need to queue up data to be written
@@ -48,24 +70,6 @@ struct bufferq {
     TAILQ_ENTRY(bufferq) entries;
 };
 
-/**
- * A struct for client specific data, also includes pointer to create
- * a list of clients.
- *
- * In event based programming it is usually necessary to keep some
- * sort of object per client for state information.
- */
-struct client {
-    /* Events. We need 2 event structures, one for read event
-     * notification and the other for writing. */
-    struct event ev_read;
-    struct event ev_write;
-
-    /* This is the queue of data to be written to this client. As
-     * we can't call write(2) until libevent tells us the socket
-     * is ready for writing. */
-    TAILQ_HEAD(, bufferq) writeq;
-};
 
 extern child_t cs[MAX_CHILDNUM];
 extern int clen;

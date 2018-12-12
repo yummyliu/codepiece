@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
 void on_channel(int sockfd, short ev, void *arg){
 	struct msghdr msg;
 	recvmsg(sockfd, &msg, 0);
-
+	// TODO
 
 }
 
@@ -114,7 +114,7 @@ void on_accept(int sockfd, short ev, void *arg){
 
 	} else {
 		clen++;
-		printf("%s\n", "this is parent");
+		printf("%s\n", "fork one child");
 	}
 }
 
@@ -130,7 +130,7 @@ void on_read(int fd, short ev, void *arg)
 	 * clients write queue. */
 	buf = (u_char*)malloc(BUFLEN);
 	if (buf == NULL)
-		err(1, "malloc failed");
+		perror("malloc failed");
 
 	len = read(fd, buf, BUFLEN);
 	if (len == 0) {
@@ -141,8 +141,7 @@ void on_read(int fd, short ev, void *arg)
 		event_del(&client->ev_read);
 		free(client);
 		return;
-	}
-	else if (len < 0) {
+	} else if (len < 0) {
 		/* Some other error occurred, close the socket, remove
 		 * the event and free the client structure. */
 		printf("Socket failure, disconnecting client: %s",
