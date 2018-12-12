@@ -17,6 +17,8 @@ bool ischild=false;
 int pid=-1;
 char* procName;
 struct event_base* ebase;
+static struct event ev_accept;
+static struct event ev_read;
 
 int main(int argc, char *argv[])
 {
@@ -53,7 +55,6 @@ int main(int argc, char *argv[])
 	listen(sockfd,5);
 
 	// event regist
-	struct event ev_accept;
 	ebase = event_init();
 	event_set(&ev_accept, sockfd, EV_READ|EV_PERSIST, on_accept, NULL);
 	if (event_add(&ev_accept, NULL) < 0) {
@@ -84,6 +85,13 @@ void on_accept(int sockfd, short ev, void *arg){
 		perror("ERROR on accept");
 		exit(1);
 	}
+	event_del(&ev_accept);
+	event_set(&ev_read, child_accept_sockfd, EV_READ|EV_PERSIST, on_read, NULL);
+	// event_set can set only once
+	// event_set(&ev_read, cs[my_pos].channel[1], EV_WRITE|EV_PERSIST, on_channel, NULL);
+	if (event_add(&ev_read, NULL) < 0) {
+		perror("error add event");
+	}
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, 0, cs[clen].channel) == -1) {
 		printf("socketpair() failed while spawning \"%s\"", "worker");
@@ -94,27 +102,16 @@ void on_accept(int sockfd, short ev, void *arg){
 		perror("ERROR on fork");
 		exit(1);
 	} else if (pid == 0) {
-		printf("%s %d\n", "this is child: ", getpid());
+		pid = getpid();
+		printf("%s %d\n", "this is child: ", pid);
 		ischild = true;
 		my_pos = clen;
 		strncpy(procName,"demo-slave",strlen(procName));
 
-		struct event ev_read;
-		event_set(&ev_read, child_accept_sockfd, EV_READ|EV_PERSIST, on_read, NULL);
-		event_set(&ev_read, cs[my_pos].channel[1], EV_WRITE|EV_PERSIST, on_channel, NULL);
-
-		if (event_add(&ev_read, NULL) < 0) {
-			perror("error add event");
-		}
-
-		// XXX child do not need event_init again?
-		if (0 < event_dispatch()) {
-			perror("error add event");
-		}
-
 	} else {
 		clen++;
 		printf("%s\n", "fork one child");
+		close(child_accept_sockfd);
 	}
 }
 
@@ -152,21 +149,22 @@ void on_read(int fd, short ev, void *arg)
 		return;
 	}
 
-	/* We can't just write the buffer back as we need to be told
-	 * when we can write by libevent.  Put the buffer on the
-	 * client's write queue and schedule a write event. */
-	bufq = (struct bufferq*)calloc(1, sizeof(struct bufferq));
-	if (bufq == NULL)
-		err(1, "malloc faild");
-	bufq->buf = buf;
-	bufq->len = len;
-	bufq->offset = 0;
-	TAILQ_INSERT_TAIL(&client->writeq, bufq, entries);
+	printf("Client Onread: %d, msg: %s\n", pid, buf);
+	// /* We can't just write the buffer back as we need to be told
+	//  * when we can write by libevent.  Put the buffer on the
+	//  * client's write queue and schedule a write event. */
+	// bufq = (struct bufferq*)calloc(1, sizeof(struct bufferq));
+	// if (bufq == NULL)
+	// 	err(1, "malloc faild");
+	// bufq->buf = buf;
+	// bufq->len = len;
+	// bufq->offset = 0;
+	// TAILQ_INSERT_TAIL(&client->writeq, bufq, entries);
 
-	/* Since we now have data that needs to be written back to the
-	 * client, add a write event. */
-	if (0 < event_add(&client->ev_write, NULL)) {
-		perror("Error event add");
-	}
+	// /* Since we now have data that needs to be written back to the
+	//  * client, add a write event. */
+	// if (0 < event_add(&client->ev_write, NULL)) {
+	// 	perror("Error event add");
+	// }
 }
 
