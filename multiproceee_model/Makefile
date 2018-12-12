@@ -1,0 +1,2 @@
+all:
+	gcc child.c channel.c sighandler.c main.c -lusual -L/Users/liuyangming/.locallib/lib -o multiprocessdemo
