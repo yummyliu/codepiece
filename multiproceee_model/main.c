@@ -17,9 +17,12 @@ bool ischild=false;
 int pid=-1;
 char* procName;
 
+int listen_fd;
+
 struct event_base* ebase;
 static struct event ev_accept;
 static struct event ev_read;
+static struct event ev_channel;
 
 int main(int argc, char *argv[])
 {
@@ -35,8 +38,8 @@ int main(int argc, char *argv[])
 	sig_regist();
 
 	// config listen_socket
-	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (sockfd < 0) {
+	listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (listen_fd < 0) {
 		perror("ERROR opening socket");
 		exit(1);
 	}
@@ -46,12 +49,12 @@ int main(int argc, char *argv[])
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = INADDR_ANY;
 	serv_addr.sin_port = htons(portno);
-	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+	if (bind(listen_fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
 		perror("ERROR on binding");
 		exit(1);
 	}
 
-	listen(sockfd,5);
+	listen(listen_fd,5);
 
 	// regist event
 	ebase = event_init();
@@ -66,7 +69,7 @@ int main(int argc, char *argv[])
 	 *	        int event_base_set(struct event_base *base, struct event *event);
 	 *	event_set can set only once
 	 */
-	event_set(&ev_accept, sockfd, EV_READ|EV_PERSIST, on_accept, NULL);
+	event_set(&ev_accept, listen_fd, EV_READ|EV_PERSIST, on_accept, NULL);
 	if (event_add(&ev_accept, NULL) < 0) {
 		perror("error add event");
 	}
@@ -103,11 +106,18 @@ void on_accept(int sockfd, short ev, void *arg){
 
 		event_del(&ev_accept);
 		event_set(&ev_read, child_accept_sockfd, EV_READ|EV_PERSIST, on_read, NULL);
-		// event_set(&ev_read, cs[my_pos].channel[1], EV_WRITE|EV_PERSIST, on_channel, NULL);
 		if (event_add(&ev_read, NULL) < 0) {
 			perror("error add event");
 		}
+		event_set(&ev_channel, cs[my_pos].channel[1], EV_WRITE|EV_PERSIST, on_channel, NULL);
+		if (event_add(&ev_channel, NULL) < 0) {
+			perror("error add event");
+		}
+
+		close(cs[my_pos].channel[0]);
+		close(listen_fd);
 	} else {
+		close(cs[clen].channel[1]);
 		clen++;
 		printf("%s\n", "fork one child");
 		close(child_accept_sockfd);
@@ -116,8 +126,6 @@ void on_accept(int sockfd, short ev, void *arg){
 
 void on_read(int fd, short ev, void *arg)
 {
-	struct client *client = (struct client *)arg;
-	struct bufferq *bufq;
 	u_char *buf;
 	int len;
 
@@ -134,8 +142,7 @@ void on_read(int fd, short ev, void *arg)
 		 * free the client structure. */
 		printf("Client disconnected.\n");
 		close(fd);
-		event_del(&client->ev_read);
-		free(client);
+		event_del(&ev_read);
 		return;
 	} else if (len < 0) {
 		/* Some other error occurred, close the socket, remove
@@ -143,8 +150,7 @@ void on_read(int fd, short ev, void *arg)
 		printf("Socket failure, disconnecting client: %s",
 				strerror(errno));
 		close(fd);
-		event_del(&client->ev_read);
-		free(client);
+		event_del(&ev_read);
 		return;
 	}
 

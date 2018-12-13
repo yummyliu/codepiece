@@ -15,6 +15,7 @@ static void sig_parent_handler(int signo)
 			for (int i = 0; i < clen; ++i) {
 				kill(cs[i].pid,SIGQUIT);
 			}
+			exit(0);
 			break;
 		default:
 			printf("caught UnKnown: %d\n", signo);
