@@ -24,23 +24,41 @@ static struct event ev_accept;
 static struct event ev_read;
 static struct event ev_channel;
 
+void usage()
+{
+	printf("demo -p $port -g\n\t-p $port\n\t-c clear debug msg");
+}
+
 int main(int argc, char *argv[])
 {
-	// parse param
-	if (argc != 2) {
-		printf("mpro $port\n");
-		exit(0);
-	}
 	procName = (argv[0]);
 	strncpy(argv[0],"demo-master",strlen(argv[0]));
-	int portno = atoi(argv[1]);
+
+	// parse param
+	int ch,portno;
+	while ((ch = getopt(argc, argv, "gp:")) != -1) {
+		switch (ch) {
+			case 'p':
+				portno = atoi(optarg);
+				break;
+			case 'g':
+				// debug
+				cf_verbose = 1;
+				break;
+			case '?':
+			default:
+				usage();
+				exit(0);
+		}
+	}
+	log_info("verbose: %d\n",cf_verbose);
 
 	sig_regist();
 
 	// config listen_socket
 	listen_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (listen_fd < 0) {
-		perror("ERROR opening socket");
+		log_error("ERROR opening socket");
 		exit(1);
 	}
 
@@ -50,7 +68,7 @@ int main(int argc, char *argv[])
 	serv_addr.sin_addr.s_addr = INADDR_ANY;
 	serv_addr.sin_port = htons(portno);
 	if (bind(listen_fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-		perror("ERROR on binding");
+		log_error("ERROR on binding");
 		exit(1);
 	}
 
@@ -71,55 +89,57 @@ int main(int argc, char *argv[])
 	 */
 	event_set(&ev_accept, listen_fd, EV_READ|EV_PERSIST, on_accept, NULL);
 	if (event_add(&ev_accept, NULL) < 0) {
-		perror("error add event");
+		log_error("error add event");
 	}
 
 	// loop event
 	if (0 < event_dispatch()) {
-		perror("error event_dispatch");
+		log_error("error event_dispatch");
 	}
 }
 void on_accept(int sockfd, short ev, void *arg){
+
+	log_debug("on_accept: %d, %p\n", ev, arg);
 
 	struct sockaddr_in cli_addr;
 	socklen_t clilen = sizeof(cli_addr);
 
 	int child_accept_sockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
 	if (child_accept_sockfd < 0) {
-		perror("ERROR on accept");
+		log_error("ERROR on accept");
 		exit(1);
 	}
 	if (socketpair(AF_UNIX, SOCK_STREAM, 0, cs[clen].channel) == -1) {
-		printf("socketpair() failed while spawning \"%s\"", "worker");
+		log_error("socketpair() failed while spawning \"%s\"", "worker");
 	}
 
 	pid = fork();
 	if (pid < 0) {
-		perror("ERROR on fork");
+		log_error("ERROR on fork");
 		exit(1);
 	} else if (pid == 0) {
 		pid = getpid();
-		printf("%s %d\n", "this is child: ", pid);
+		log_debug("%s %d\n", "this is child: ", pid);
 		ischild = true;
 		my_pos = clen;
 		strncpy(procName,"demo-slave",strlen(procName));
 
-		event_del(&ev_accept);
 		event_set(&ev_read, child_accept_sockfd, EV_READ|EV_PERSIST, on_read, NULL);
 		if (event_add(&ev_read, NULL) < 0) {
-			perror("error add event");
+			log_error("error add event");
 		}
 		event_set(&ev_channel, cs[my_pos].channel[1], EV_WRITE|EV_PERSIST, on_channel, NULL);
 		if (event_add(&ev_channel, NULL) < 0) {
-			perror("error add event");
+			log_error("error add event");
 		}
 
+		event_del(&ev_accept);
 		close(cs[my_pos].channel[0]);
 		close(listen_fd);
 	} else {
-		close(cs[clen].channel[1]);
+		close(cs[clen++].channel[1]);
 		clen++;
-		printf("%s\n", "fork one child");
+		log_debug("fork one child");
 		close(child_accept_sockfd);
 	}
 }
@@ -134,27 +154,27 @@ void on_read(int fd, short ev, void *arg)
 	 * clients write queue. */
 	buf = (u_char*)malloc(BUFLEN);
 	if (buf == NULL)
-		perror("malloc failed");
+		log_error("malloc failed");
 
 	len = read(fd, buf, BUFLEN);
 	if (len == 0) {
 		/* Client disconnected, remove the read event and the
 		 * free the client structure. */
-		printf("Client disconnected.\n");
+		log_info("Client disconnected.\n");
 		close(fd);
 		event_del(&ev_read);
 		return;
 	} else if (len < 0) {
 		/* Some other error occurred, close the socket, remove
 		 * the event and free the client structure. */
-		printf("Socket failure, disconnecting client: %s",
+		log_debug("Socket failure, disconnecting client: %s",
 				strerror(errno));
 		close(fd);
 		event_del(&ev_read);
 		return;
 	}
 
-	printf("Client Onread: %d, msg: %s\n", pid, buf);
+	log_debug("%d got msg: %s\n", pid, buf);
 	// /* We can't just write the buffer back as we need to be told
 	//  * when we can write by libevent.  Put the buffer on the
 	//  * client's write queue and schedule a write event. */
@@ -169,7 +189,7 @@ void on_read(int fd, short ev, void *arg)
 	// /* Since we now have data that needs to be written back to the
 	//  * client, add a write event. */
 	// if (0 < event_add(&client->ev_write, NULL)) {
-	// 	perror("Error event add");
+	// 	log_error("Error event add");
 	// }
 }
 

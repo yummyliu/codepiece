@@ -14,6 +14,8 @@
 #include <sys/socket.h>
 #include <sys/queue.h>
 
+#include "usual/logging.h"
+
 #define MAX_CHILDNUM 5
 #define BUFLEN 256
 
@@ -88,5 +90,7 @@ extern int pid;
 extern char* procName;
 
 extern struct event_base* ebase;
+
+extern int cf_verbose;
 
 #endif /* ifndef GLOBAL_H */
