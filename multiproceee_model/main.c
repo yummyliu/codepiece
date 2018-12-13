@@ -16,37 +16,36 @@ int my_pos = -1;
 bool ischild=false;
 int pid=-1;
 char* procName;
+
 struct event_base* ebase;
 static struct event ev_accept;
 static struct event ev_read;
 
 int main(int argc, char *argv[])
 {
+	// parse param
 	if (argc != 2) {
 		printf("mpro $port\n");
 		exit(0);
 	}
 	procName = (argv[0]);
 	strncpy(argv[0],"demo-master",strlen(argv[0]));
+	int portno = atoi(argv[1]);
 
 	sig_regist();
 
-	// socket config & listen
-	int sockfd;
-	int portno = atoi(argv[1]);
-	struct sockaddr_in serv_addr;
-
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	// config listen_socket
+	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd < 0) {
 		perror("ERROR opening socket");
 		exit(1);
 	}
 
+	struct sockaddr_in serv_addr;
 	bzero((char *) &serv_addr, sizeof(serv_addr));
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = INADDR_ANY;
 	serv_addr.sin_port = htons(portno);
-
 	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
 		perror("ERROR on binding");
 		exit(1);
@@ -54,45 +53,39 @@ int main(int argc, char *argv[])
 
 	listen(sockfd,5);
 
-	// event regist
+	// regist event
 	ebase = event_init();
+	/*
+	 *	Pre-2.0 versions of Libevent did not have event_assign() or event_new().
+	 *	Instead, you had event_set(), which associated the event with the "current" base.
+	 *	If you had more than one base, you needed to remember to call event_base_set()
+	 *	afterwards to make sure that the event was associated with the base you actually wanted to use.
+	 *	Interface
+	 *	void event_set(struct event *event, evutil_socket_t fd, short what,
+	 *	        void(*callback)(evutil_socket_t, short, void *), void *arg);
+	 *	        int event_base_set(struct event_base *base, struct event *event);
+	 *	event_set can set only once
+	 */
 	event_set(&ev_accept, sockfd, EV_READ|EV_PERSIST, on_accept, NULL);
 	if (event_add(&ev_accept, NULL) < 0) {
 		perror("error add event");
 	}
 
-	/* Start the libevent event loop. */
+	// loop event
 	if (0 < event_dispatch()) {
 		perror("error event_dispatch");
 	}
 }
-
-void on_channel(int sockfd, short ev, void *arg){
-	struct msghdr msg;
-	recvmsg(sockfd, &msg, 0);
-	// TODO
-
-}
-
 void on_accept(int sockfd, short ev, void *arg){
 
 	struct sockaddr_in cli_addr;
 	socklen_t clilen = sizeof(cli_addr);
 
-	// XXX accept before fork? or fork before accept?
 	int child_accept_sockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
 	if (child_accept_sockfd < 0) {
 		perror("ERROR on accept");
 		exit(1);
 	}
-	event_del(&ev_accept);
-	event_set(&ev_read, child_accept_sockfd, EV_READ|EV_PERSIST, on_read, NULL);
-	// event_set can set only once
-	// event_set(&ev_read, cs[my_pos].channel[1], EV_WRITE|EV_PERSIST, on_channel, NULL);
-	if (event_add(&ev_read, NULL) < 0) {
-		perror("error add event");
-	}
-
 	if (socketpair(AF_UNIX, SOCK_STREAM, 0, cs[clen].channel) == -1) {
 		printf("socketpair() failed while spawning \"%s\"", "worker");
 	}
@@ -108,6 +101,12 @@ void on_accept(int sockfd, short ev, void *arg){
 		my_pos = clen;
 		strncpy(procName,"demo-slave",strlen(procName));
 
+		event_del(&ev_accept);
+		event_set(&ev_read, child_accept_sockfd, EV_READ|EV_PERSIST, on_read, NULL);
+		// event_set(&ev_read, cs[my_pos].channel[1], EV_WRITE|EV_PERSIST, on_channel, NULL);
+		if (event_add(&ev_read, NULL) < 0) {
+			perror("error add event");
+		}
 	} else {
 		clen++;
 		printf("%s\n", "fork one child");
@@ -167,4 +166,12 @@ void on_read(int fd, short ev, void *arg)
 	// 	perror("Error event add");
 	// }
 }
+
+void on_channel(int sockfd, short ev, void *arg){
+	struct msghdr msg;
+	recvmsg(sockfd, &msg, 0);
+	// TODO
+
+}
+
 
