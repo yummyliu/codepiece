@@ -18,6 +18,7 @@ int pid=-1;
 char* procName;
 
 int listen_fd;
+int listen_port;
 
 struct event_base* ebase;
 static struct event ev_accept;
@@ -29,17 +30,14 @@ void usage()
 	printf("demo -p $port -g\n\t-p $port\n\t-c clear debug msg");
 }
 
-int main(int argc, char *argv[])
-{
+void demoinit(int argc, char* argv[]) {
 	procName = (argv[0]);
 	strncpy(argv[0],"demo-master",strlen(argv[0]));
-
-	// parse param
-	int ch,portno;
+	int ch;
 	while ((ch = getopt(argc, argv, "gp:")) != -1) {
 		switch (ch) {
 			case 'p':
-				portno = atoi(optarg);
+				listen_port = atoi(optarg);
 				break;
 			case 'g':
 				// debug
@@ -51,7 +49,12 @@ int main(int argc, char *argv[])
 				exit(0);
 		}
 	}
-	log_info("verbose: %d\n",cf_verbose);
+
+}
+
+int main(int argc, char *argv[])
+{
+	demoinit(argc,argv);
 
 	sig_regist();
 
@@ -66,7 +69,7 @@ int main(int argc, char *argv[])
 	bzero((char *) &serv_addr, sizeof(serv_addr));
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = INADDR_ANY;
-	serv_addr.sin_port = htons(portno);
+	serv_addr.sin_port = htons(listen_port);
 	if (bind(listen_fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
 		log_error("ERROR on binding");
 		exit(1);
