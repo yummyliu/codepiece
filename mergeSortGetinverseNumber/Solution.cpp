@@ -79,7 +79,7 @@ private:
 
 int main(int argc, char *argv[])
 {
-	string abc = "snabasdlkfjalksdjfuasdfasdf";
+	string abc = "snabasdl";
 
 	Solution s;
 	std::cout << abc.size() << std::endl;
