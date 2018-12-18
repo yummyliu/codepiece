@@ -91,5 +91,4 @@ void client_handler(int fd, short ev, void *arg);
 void channel_handler(int fd, short ev, void *arg);
 
 void construct_client(void* obj);
-
 #endif /* ifndef GLOBAL_H */
