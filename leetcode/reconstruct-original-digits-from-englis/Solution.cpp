@@ -47,7 +47,7 @@ public:
 
         return cs.empty();
     }
-    string originalDigits(string s) {
+    string originalDigitsV1(string s) {
         vector<string> ns = {"zero",
                             "one",
                             "two",
@@ -70,6 +70,40 @@ public:
 		std::copy(ret.begin(), ret.end(), std::ostream_iterator<int>(result, " "));
         return result.str();
     }
+	string originalDigits(string s) {
+		vector<string> ns = {"zero",
+                            "one",
+                            "two",
+                            "three",
+                            "four",
+                            "five",
+                            "six",
+                            "seven",
+                            "eight",
+                            "nine"};
+        unordered_map<char, int> cs;
+		vector<int> nums = {0,2,4,6,8,1,3,5,7,9};
+		string dchar = "zwuxgorfvi";
+        for (char c : s) {
+            cs[c]++;
+        }
+
+		string ret;
+		for (int i = 0; i < 10; ++i) {
+			int count =cs[dchar[i]];
+			for (char c : ns[nums[i]]) {
+				cs[c] -= count;
+			}
+
+			while (count!=0) {
+				ret.append(to_string(nums[i]));
+				count --;
+			}
+		}
+
+		sort(ret.begin(), ret.end());
+		return ret;
+	}
 };
 
 int main()
