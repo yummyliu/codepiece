@@ -1,3 +1,10 @@
+#include <vector>
+#include <string>
+#include <queue>
+#include <unordered_set>
+
+using namespace std;
+
 class Solution {
 public:
     char upc(char c) {
@@ -17,7 +24,7 @@ public:
            && visited.find(ss) == visited.end()) {
             return true;
         }
-        
+
         return false;
     }
 
@@ -26,37 +33,50 @@ public:
         for (auto ds : deadends) {
             de.insert(ds);
         }
+        if (de.find("0000")!=de.end())
+            return -1;
+
         unordered_set<string> visited;
-        
+
         int count = 0;
         queue<string> qs;
         qs.push("0000");
         visited.insert("0000");
-        
+
         while (!qs.empty()) {
-            string cur = qs.front();
-            visited.insert(cur);
-            qs.pop();
-            
-            if (cur==target)
-                break;
-            
-            for (int i=0; i<4; i++) {
-                // up
-                string ups = cur;
-                ups[i] = upc(ups[i]);
-                if (isValid(ups, de, visited))
-                    qs.push(ups);
-                
-                // down
-                string downs = cur;
-                downs[i] = downc(downs[i]);
-                if (isValid(downs, de, visited))
-                    qs.push(downs);
-            }
+
+			queue<string> newqs;
+			while (!qs.empty()) {
+				string cur = qs.front();
+            	qs.pop();
+
+            	if (cur==target)
+            	    return count;
+
+            	for (int i=0; i<4; i++) {
+            	    // up
+            	    string ups = cur;
+            	    ups[i] = upc(ups[i]);
+            	    if (isValid(ups, de, visited)) {
+                        newqs.push(ups);
+                        visited.insert(ups);
+                    }
+
+
+            	    // down
+            	    string downs = cur;
+            	    downs[i] = downc(downs[i]);
+            	    if (isValid(downs, de, visited)) {
+            	        newqs.push(downs);
+                        visited.insert(downs);
+                    }
+            	}
+			}
+
             count ++;
+			qs = newqs;
         }
-        
-        return count;;
+
+        return -1;
     }
 };
