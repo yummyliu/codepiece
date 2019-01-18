@@ -17,5 +17,11 @@ int main(int argc, char *argv[])
 	int b = 10;
 	func1(b);
 	std::cout << b << std::endl;
+
+
+	cout << "----" <<endl;
+
+	cout << sizeof(long long) << endl;
+	cout << sizeof(long) << endl;
 	return 0;
 }

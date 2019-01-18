@@ -1,9 +1,10 @@
+#include <stack>
+using namespace std;
+
 class MinStack {
 public:
-    /** initialize your data structure here. */
     MinStack() {
     }
-    
     void push(int x) {
         if (mys.empty()) {
             mys.push(0);
@@ -13,34 +14,45 @@ public:
             if (x<min) min = x;
         }
     }
-    
     void pop() {
         if (mys.empty())
             return;
-        
-        long t = mys.top();
+        long long t = mys.top();
         mys.pop();
         if (t<0)
             min = min-t;
     }
-    
     int top() {
-        return min+mys.top();
+		long long t = mys.top();
+		if (t<0) {
+			return min;
+		}
+        return min+t;
     }
-    
     int getMin() {
         return min;
     }
-    
-    long min;
-    stack<long> mys;
+    long long min;
+    stack<long long> mys;
 };
 
-/**
- * Your MinStack object will be instantiated and called as such:
- * MinStack obj = new MinStack();
- * obj.push(x);
- * obj.pop();
- * int param_3 = obj.top();
- * int param_4 = obj.getMin();
- */
+class MinStackV2 {
+private:
+    stack<int> s1;
+    stack<int> s2;
+public:
+    void push(int x) {
+	    s1.push(x);
+	    if (s2.empty() || x <= getMin())  s2.push(x);
+    }
+    void pop() {
+	    if (s1.top() == getMin())  s2.pop();
+	    s1.pop();
+    }
+    int top() {
+	    return s1.top();
+    }
+    int getMin() {
+	    return s2.top();
+    }
+};
